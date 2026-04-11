@@ -49,7 +49,7 @@ services:
       dockerfile: ../docker/node/Dockerfile
     container_name: ai_mysql_frontend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

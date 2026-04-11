@@ -2,12 +2,19 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
-  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
 });
+
+export const setDbToken = (token) => {
+  if (token) {
+    api.defaults.headers.common['X-DB-Token'] = token;
+  } else {
+    delete api.defaults.headers.common['X-DB-Token'];
+  }
+};
 
 export const connectDB = (credentials) => api.post('/connect', credentials);
 export const getSchema = () => api.get('/schema');

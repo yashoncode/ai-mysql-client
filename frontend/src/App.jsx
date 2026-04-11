@@ -3,6 +3,7 @@ import ConnectionForm from './components/ConnectionForm';
 import SchemaExplorer from './components/SchemaExplorer';
 import QueryEditor from './components/QueryEditor';
 import ResultsTable from './components/ResultsTable';
+import { setDbToken } from './services/api';
 import AIChat from './components/AIChat';
 
 function App() {
@@ -37,7 +38,7 @@ function App() {
         </div>
         <div className="p-3 border-t border-gray-700">
           <button
-            onClick={() => { setConnected(false); setConnectionInfo(null); setQueryResults(null); }}
+            onClick={() => { setDbToken(null); setConnected(false); setConnectionInfo(null); setQueryResults(null); }}
             className="w-full text-xs text-gray-400 hover:text-red-400 transition-colors py-1"
           >
             Disconnect

@@ -98,7 +98,7 @@ class DynamicDatabaseService
         }
 
         $start = microtime(true);
-        $results = DB::connection('user_mysql')->select(DB::raw($sql));
+        $results = DB::connection('user_mysql')->select($sql);
         $executionTime = round((microtime(true) - $start) * 1000, 2);
 
         $data = array_map(fn($row) => (array) $row, $results);

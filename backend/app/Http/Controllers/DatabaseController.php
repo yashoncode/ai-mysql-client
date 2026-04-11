@@ -29,14 +29,15 @@ class DatabaseController extends Controller
         try {
             $result = $this->dbService->testConnection($validated);
 
-            // Store encrypted credentials in session
-            session(['db_credentials' => Crypt::encrypt($validated)]);
+            // Return encrypted credentials as a token for stateless reconnection
+            $token = Crypt::encryptString(json_encode($validated));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Connected successfully',
                 'version' => $result['version'],
                 'server_time' => $result['server_time'],
+                'token' => $token,
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -46,20 +47,20 @@ class DatabaseController extends Controller
         }
     }
 
-    protected function reconnect(): void
+    protected function reconnect(Request $request): void
     {
-        $encryptedCreds = session('db_credentials');
-        if (!$encryptedCreds) {
+        $token = $request->header('X-DB-Token');
+        if (!$token) {
             throw new Exception('No database connection. Please connect first.');
         }
-        $credentials = Crypt::decrypt($encryptedCreds);
+        $credentials = json_decode(Crypt::decryptString($token), true);
         $this->dbService->connect($credentials);
     }
 
-    public function schema(): JsonResponse
+    public function schema(Request $request): JsonResponse
     {
         try {
-            $this->reconnect();
+            $this->reconnect($request);
             $tables = $this->dbService->getTables();
             $schema = [];
 
@@ -81,7 +82,7 @@ class DatabaseController extends Controller
         $request->validate(['sql' => 'required|string']);
 
         try {
-            $this->reconnect();
+            $this->reconnect($request);
             $result = $this->dbService->executeQuery($request->input('sql'));
 
             return response()->json([
@@ -98,7 +99,7 @@ class DatabaseController extends Controller
         $request->validate(['question' => 'required|string']);
 
         try {
-            $this->reconnect();
+            $this->reconnect($request);
             $schema = $this->dbService->getFullSchema();
             $result = $this->aiService->generateSQL($request->input('question'), $schema);
 
@@ -116,7 +117,7 @@ class DatabaseController extends Controller
         ]);
 
         try {
-            $this->reconnect();
+            $this->reconnect($request);
             $schema = $this->dbService->getFullSchema();
             $result = $this->aiService->analyzeResults(
                 $request->input('query'),
@@ -138,7 +139,7 @@ class DatabaseController extends Controller
         ]);
 
         try {
-            $this->reconnect();
+            $this->reconnect($request);
             $schema = $this->dbService->getFullSchema();
             $response = $this->aiService->chat(
                 $request->input('message'),

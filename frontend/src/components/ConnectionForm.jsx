@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { connectDB } from '../services/api';
+import { connectDB, setDbToken } from '../services/api';
 
 const ConnectionForm = ({ onConnected }) => {
   const [formData, setFormData] = useState({
@@ -24,6 +24,7 @@ const ConnectionForm = ({ onConnected }) => {
     try {
       const res = await connectDB(formData);
       if (res.data.success) {
+        setDbToken(res.data.token);
         onConnected(res.data);
       } else {
         setError(res.data.message || 'Connection failed');
