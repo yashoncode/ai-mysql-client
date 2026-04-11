@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ConnectionForm from './components/ConnectionForm';
 import SchemaExplorer from './components/SchemaExplorer';
 import QueryEditor from './components/QueryEditor';
 import ResultsTable from './components/ResultsTable';
-import { setDbToken } from './services/api';
+import { setDbToken, loadSession } from './services/api';
 import AIChat from './components/AIChat';
 
 function App() {
   const [connected, setConnected] = useState(false);
   const [connectionInfo, setConnectionInfo] = useState(null);
   const [queryResults, setQueryResults] = useState(null);
+
+  useEffect(() => {
+    const saved = loadSession();
+    if (saved) {
+      setConnected(true);
+      setConnectionInfo(saved);
+    }
+  }, []);
 
   const handleConnected = (info) => {
     setConnected(true);

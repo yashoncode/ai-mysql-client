@@ -9,7 +9,7 @@ use Exception;
 class GeminiAIService
 {
     protected string $apiKey;
-    protected string $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    protected string $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
     public function __construct()
     {
@@ -107,19 +107,31 @@ PROMPT;
             throw new Exception("Gemini API key is not configured.");
         }
 
-        $response = Http::timeout(30)->post("{$this->apiUrl}?key={$this->apiKey}", [
-            'contents' => [
-                [
-                    'parts' => [
-                        ['text' => $prompt]
+        $maxRetries = 3;
+        $response = null;
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $response = Http::timeout(30)->post("{$this->apiUrl}?key={$this->apiKey}", [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $prompt]
+                        ]
                     ]
-                ]
-            ],
-            'generationConfig' => [
-                'temperature'     => 0.1,
-                'maxOutputTokens' => 2048,
-            ],
-        ]);
+                ],
+                'generationConfig' => [
+                    'temperature'     => 0.1,
+                    'maxOutputTokens' => 2048,
+                ],
+            ]);
+
+            if ($response->status() !== 429 || $attempt === $maxRetries) {
+                break;
+            }
+
+            Log::warning("Gemini API rate limited, retrying attempt {$attempt}/{$maxRetries}");
+            sleep(pow(2, $attempt));
+        }
 
         if (!$response->successful()) {
             Log::error('Gemini API error', ['status' => $response->status(), 'body' => $response->body()]);

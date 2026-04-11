@@ -11,9 +11,26 @@ const api = axios.create({
 export const setDbToken = (token) => {
   if (token) {
     api.defaults.headers.common['X-DB-Token'] = token;
+    localStorage.setItem('dbToken', token);
   } else {
     delete api.defaults.headers.common['X-DB-Token'];
+    localStorage.removeItem('dbToken');
+    localStorage.removeItem('connectionInfo');
   }
+};
+
+export const saveConnectionInfo = (info) => {
+  localStorage.setItem('connectionInfo', JSON.stringify(info));
+};
+
+export const loadSession = () => {
+  const token = localStorage.getItem('dbToken');
+  const info = localStorage.getItem('connectionInfo');
+  if (token && info) {
+    api.defaults.headers.common['X-DB-Token'] = token;
+    return JSON.parse(info);
+  }
+  return null;
 };
 
 export const connectDB = (credentials) => api.post('/connect', credentials);
