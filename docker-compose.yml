@@ -1,29 +1,22 @@
-version: "3.8"
+version: '3.8'
 
 services:
   app:
     build:
-      context: ./docker/php
-      dockerfile: Dockerfile
-    container_name: laravel-app
-    restart: unless-stopped
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ai_mysql_app
     working_dir: /var/www
     volumes:
       - ./backend:/var/www
     depends_on:
       - mysql
-      - redis
     networks:
       - app-network
-    environment:
-      - DB_CONNECTION=mysql
-      - DB_HOST=mysql
-      - DB_PORT=3306
 
   nginx:
     image: nginx:alpine
-    container_name: nginx-server
-    restart: unless-stopped
+    container_name: ai_mysql_nginx
     ports:
       - "8000:80"
     volumes:
@@ -36,8 +29,7 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: mysql-db
-    restart: unless-stopped
+    container_name: ai_mysql_db
     ports:
       - "3307:3306"
     environment:
@@ -46,7 +38,7 @@ services:
       MYSQL_USER: testuser
       MYSQL_PASSWORD: testpassword
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network
@@ -55,8 +47,7 @@ services:
     build:
       context: ./frontend
       dockerfile: ../docker/node/Dockerfile
-    container_name: react-frontend
-    restart: unless-stopped
+    container_name: ai_mysql_frontend
     ports:
       - "3000:3000"
     volumes:
@@ -65,23 +56,20 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:8000/api
       - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=true
-    stdin_open: true
     networks:
       - app-network
 
   redis:
     image: redis:alpine
-    container_name: redis-cache
-    restart: unless-stopped
+    container_name: ai_mysql_redis
     ports:
       - "6379:6379"
     networks:
       - app-network
 
-volumes:
-  mysql-data:
-
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  mysql_data:
