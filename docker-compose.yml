@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ai_mysql_app
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: ai_mysql_nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: ai_mysql_db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpassword
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/node/Dockerfile
+    container_name: ai_mysql_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+      - WATCHPACK_POLLING=true
+    networks:
+      - app-network
+
+  redis:
+    image: redis:alpine
+    container_name: ai_mysql_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
