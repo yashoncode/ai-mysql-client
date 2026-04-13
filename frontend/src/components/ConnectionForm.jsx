@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { connectDB, setDbToken, saveConnectionInfo } from '../services/api';
+import { connectDB } from '../services/api';
 
-const ConnectionForm = ({ onConnected }) => {
+const ConnectionForm = ({ onConnected, onCancel }) => {
   const [formData, setFormData] = useState({
     host: 'localhost',
     port: 3306,
@@ -24,8 +24,6 @@ const ConnectionForm = ({ onConnected }) => {
     try {
       const res = await connectDB(formData);
       if (res.data.success) {
-        setDbToken(res.data.token);
-        saveConnectionInfo(res.data);
         onConnected(res.data);
       } else {
         setError(res.data.message || 'Connection failed');
@@ -43,7 +41,7 @@ const ConnectionForm = ({ onConnected }) => {
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">🗄️</div>
           <h1 className="text-3xl font-bold text-white">AI MySQL Client</h1>
-          <p className="text-gray-400 mt-2">Connect to your MySQL database</p>
+          <p className="text-gray-400 mt-2">{onCancel ? 'Add another connection' : 'Connect to your MySQL database'}</p>
         </div>
 
         {error && (
@@ -130,6 +128,16 @@ const ConnectionForm = ({ onConnected }) => {
               </span>
             ) : '🔌 Connect to Database'}
           </button>
+
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="w-full text-gray-400 hover:text-white text-sm py-2 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
         </form>
       </div>
     </div>

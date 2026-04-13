@@ -16,6 +16,45 @@ class DatabaseController extends Controller
         protected GeminiAIService $aiService
     ) {}
 
+    protected function decodeToken(Request $request): array
+    {
+        $token = $request->header('X-DB-Token');
+        if (!$token) {
+            return [];
+        }
+        return json_decode(Crypt::decryptString($token), true) ?: [];
+    }
+
+    protected function encodeToken(array $connections): string
+    {
+        return Crypt::encryptString(json_encode($connections));
+    }
+
+    protected function reconnect(Request $request, ?string $connectionId = null): void
+    {
+        $connections = $this->decodeToken($request);
+        if (empty($connections)) {
+            throw new Exception('No database connection. Please connect first.');
+        }
+
+        $id = $connectionId ?? $request->input('connection_id') ?? $request->header('X-DB-Active');
+        if ($id && isset($connections[$id])) {
+            $this->dbService->connect($connections[$id]);
+        } else {
+            // Default to first connection
+            $this->dbService->connect(reset($connections));
+        }
+    }
+
+    protected function reconnectAll(Request $request): array
+    {
+        $connections = $this->decodeToken($request);
+        if (empty($connections)) {
+            throw new Exception('No database connection. Please connect first.');
+        }
+        return $connections;
+    }
+
     public function connect(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -29,8 +68,12 @@ class DatabaseController extends Controller
         try {
             $result = $this->dbService->testConnection($validated);
 
-            // Return encrypted credentials as a token for stateless reconnection
-            $token = Crypt::encryptString(json_encode($validated));
+            // Build connections map: merge with existing or start fresh
+            $connections = $this->decodeToken($request);
+            $id = uniqid('db_');
+            $connections[$id] = $validated;
+
+            $token = $this->encodeToken($connections);
 
             return response()->json([
                 'success' => true,
@@ -38,6 +81,8 @@ class DatabaseController extends Controller
                 'version' => $result['version'],
                 'server_time' => $result['server_time'],
                 'token' => $token,
+                'connection_id' => $id,
+                'connection_label' => $validated['database'] . '@' . $validated['host'],
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -47,30 +92,57 @@ class DatabaseController extends Controller
         }
     }
 
-    protected function reconnect(Request $request): void
+    public function disconnect(Request $request): JsonResponse
     {
-        $token = $request->header('X-DB-Token');
-        if (!$token) {
-            throw new Exception('No database connection. Please connect first.');
+        $request->validate(['connection_id' => 'required|string']);
+
+        $connections = $this->decodeToken($request);
+        $id = $request->input('connection_id');
+
+        unset($connections[$id]);
+
+        if (empty($connections)) {
+            return response()->json([
+                'success' => true,
+                'token' => null,
+                'connections' => [],
+            ]);
         }
-        $credentials = json_decode(Crypt::decryptString($token), true);
-        $this->dbService->connect($credentials);
+
+        return response()->json([
+            'success' => true,
+            'token' => $this->encodeToken($connections),
+            'connections' => collect($connections)->map(fn($c, $cid) => [
+                'id' => $cid,
+                'label' => $c['database'] . '@' . $c['host'],
+            ])->values(),
+        ]);
     }
 
     public function schema(Request $request): JsonResponse
     {
         try {
-            $this->reconnect($request);
-            $tables = $this->dbService->getTables();
-            $schema = [];
+            $connections = $this->reconnectAll($request);
+            $allSchemas = [];
 
-            foreach ($tables as $table) {
-                $schema[$table] = $this->dbService->getTableSchema($table);
+            foreach ($connections as $id => $creds) {
+                $this->dbService->connect($creds);
+                $label = $creds['database'] . '@' . $creds['host'];
+                $tables = $this->dbService->getTables();
+                $schema = [];
+                foreach ($tables as $table) {
+                    $schema[$table] = $this->dbService->getTableSchema($table);
+                }
+                $allSchemas[$id] = [
+                    'label' => $label,
+                    'database' => $creds['database'],
+                    'tables' => $schema,
+                ];
             }
 
             return response()->json([
                 'success' => true,
-                'tables'  => $schema,
+                'schemas' => $allSchemas,
             ]);
         } catch (Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
@@ -99,8 +171,13 @@ class DatabaseController extends Controller
         $request->validate(['question' => 'required|string']);
 
         try {
-            $this->reconnect($request);
-            $schema = $this->dbService->getFullSchema();
+            $connections = $this->reconnectAll($request);
+            $schema = '';
+            foreach ($connections as $id => $creds) {
+                $this->dbService->connect($creds);
+                $schema .= "=== Database: {$creds['database']}@{$creds['host']} ===\n";
+                $schema .= $this->dbService->getFullSchema() . "\n";
+            }
             $result = $this->aiService->generateSQL($request->input('question'), $schema);
 
             return response()->json(['success' => true, ...$result]);
@@ -139,8 +216,13 @@ class DatabaseController extends Controller
         ]);
 
         try {
-            $this->reconnect($request);
-            $schema = $this->dbService->getFullSchema();
+            $connections = $this->reconnectAll($request);
+            $schema = '';
+            foreach ($connections as $id => $creds) {
+                $this->dbService->connect($creds);
+                $schema .= "=== Database: {$creds['database']}@{$creds['host']} ===\n";
+                $schema .= $this->dbService->getFullSchema() . "\n";
+            }
             $response = $this->aiService->chat(
                 $request->input('message'),
                 $schema,

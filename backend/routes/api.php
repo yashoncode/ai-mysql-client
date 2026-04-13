@@ -4,6 +4,7 @@ use App\Http\Controllers\DatabaseController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/connect', [DatabaseController::class, 'connect']);
+Route::post('/disconnect', [DatabaseController::class, 'disconnect']);
 
 Route::group([], function () {
     Route::get('/schema', [DatabaseController::class, 'schema']);

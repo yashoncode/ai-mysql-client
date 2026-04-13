@@ -14,26 +14,46 @@ export const setDbToken = (token) => {
     localStorage.setItem('dbToken', token);
   } else {
     delete api.defaults.headers.common['X-DB-Token'];
+    delete api.defaults.headers.common['X-DB-Active'];
     localStorage.removeItem('dbToken');
-    localStorage.removeItem('connectionInfo');
+    localStorage.removeItem('connections');
+    localStorage.removeItem('activeConnection');
   }
 };
 
-export const saveConnectionInfo = (info) => {
-  localStorage.setItem('connectionInfo', JSON.stringify(info));
+export const setActiveConnection = (connectionId) => {
+  if (connectionId) {
+    api.defaults.headers.common['X-DB-Active'] = connectionId;
+    localStorage.setItem('activeConnection', connectionId);
+  } else {
+    delete api.defaults.headers.common['X-DB-Active'];
+    localStorage.removeItem('activeConnection');
+  }
+};
+
+export const saveConnections = (connections) => {
+  localStorage.setItem('connections', JSON.stringify(connections));
 };
 
 export const loadSession = () => {
   const token = localStorage.getItem('dbToken');
-  const info = localStorage.getItem('connectionInfo');
-  if (token && info) {
+  const connections = localStorage.getItem('connections');
+  const activeConnection = localStorage.getItem('activeConnection');
+  if (token && connections) {
     api.defaults.headers.common['X-DB-Token'] = token;
-    return JSON.parse(info);
+    if (activeConnection) {
+      api.defaults.headers.common['X-DB-Active'] = activeConnection;
+    }
+    return {
+      connections: JSON.parse(connections),
+      activeConnection,
+    };
   }
   return null;
 };
 
 export const connectDB = (credentials) => api.post('/connect', credentials);
+export const disconnectDB = (connectionId) => api.post('/disconnect', { connection_id: connectionId });
 export const getSchema = () => api.get('/schema');
 export const executeQuery = (sql) => api.post('/query', { sql });
 export const generateSQL = (question) => api.post('/ai/generate-sql', { question });
