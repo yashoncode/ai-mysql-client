@@ -14,7 +14,7 @@ class DynamicDatabaseService
     {
         $this->credentials = $credentials;
 
-        Config::set('database.connections.user_mysql', [
+        $config = [
             'driver'    => 'mysql',
             'host'      => $credentials['host'],
             'port'      => $credentials['port'] ?? 3306,
@@ -25,7 +25,21 @@ class DynamicDatabaseService
             'collation' => 'utf8mb4_unicode_ci',
             'prefix'    => '',
             'strict'    => true,
-        ]);
+            'options'   => [
+                \PDO::ATTR_TIMEOUT => 10,
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            ],
+        ];
+
+        // Enable SSL for remote hosts (e.g. AWS RDS)
+        $host = $credentials['host'];
+        $isLocal = in_array($host, ['localhost', '127.0.0.1', 'mysql', 'db', '::1']);
+        if (!$isLocal) {
+            $config['options'][\PDO::MYSQL_ATTR_SSL_CA] = true;
+            $config['options'][\PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+        }
+
+        Config::set('database.connections.user_mysql', $config);
 
         DB::purge('user_mysql');
         DB::reconnect('user_mysql');
